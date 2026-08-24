@@ -7,7 +7,7 @@ int main() {
     // no hot reloading or rebuild. Must recompile to see newly added items
     printf("This is the log");
 
-    return 0;
+    return 0; // always return 
 }
 
 // gcc main.c -o (outputs into terminal) WUMBO (name of the executable)
