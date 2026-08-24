@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+// You can "create a type internally" by doig this (since strings arent real, dumb)
+// typedef char *string; <-- string is the type name, and it is just a char allocation for fixed storage
+// This is still immutable since it is read only memory
+
 // useful info:
 // int = whole number (4 bytes)
 // float = single-precision decimal numbe (4 bytes)
