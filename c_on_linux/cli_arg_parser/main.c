@@ -1,73 +1,122 @@
-/*
-Parse arguments from the terminal and output the input as follows:
-- Commands: ....
-- input file: ... (None if "<" not used)
-- Output file: ... (None if ">" and ">>" not used)
-- Background: Yes/No (No if "&" not used)
-*/  
-
 // TODO:
-// If no pipes in input
-//  Singular:
-//    split command by spaces
-//    check validity against PATH? for command first (first item in spaces)
-//    Once valid, check for file parsing (likely second command)
-//    Lastly check for background (& symbol)
-//    store data (commands, file input, file output, background)
-//    output
-//    Repeat
+//    Create function to run basic core parsing logic
+//    check validity against PATH & Arg valid
 //  Multiple:
-//    repeat the singular steps in a loop
+//    do strok until no pipe
+//    at each iteration, call the function above or a slightly different one
 //    once loop ends, output
-//    repeat
-// Loop entire program
-// unit test?
 
-# include <stdio.h>
-# include <string.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
 
-#define MAX_INPUT 1024
 #define MAX_OUTPUT 512
-#define MAX_COMMANDS_AND_ARGS 128
+#define MAX_INPUT 128
 
-int main() {
-    // This is likely long enough to handle 99% of user cases
-    char user_input[MAX_OUTPUT];
-    char *file_inputs[MAX_OUTPUT];
-    char *file_outputs[MAX_OUTPUT];
-    char *commands[MAX_OUTPUT];
-    char *command_and_args[MAX_COMMANDS_AND_ARGS]
-    bool is_background_job;
+// edge cases: &, < input.txt - both should crash, but doing the validity of command would catch it?
 
-    printf("Enter your commands: \n");
+// output the array as one string
+char *combine_items(char **items, int total_items, char *buffer)
+{
+    for (int i = 0; i < total_items; i++)
+    {
+        buffer = strcat(buffer, items[i]);
 
-    if (fgets(user_input, sizeof user_input, stdin) != NULL) {
-        // only "one" command came through, no pipes
-        if (strchr(user_input, '|') == NULL) {
-            // split command by spaces to get true list of arguments
-            
-            return 0;
+        if (i != total_items - 1)
+        {
+            buffer = strcat(buffer, ", ");
         }
-
-
-        int total_commands = 0;
-        char *current_command = strtok(user_input, "|");
-
-        while (current_command != NULL && total_commands < 512) {
-            commands[total_commands] = current_command;
-            current_command = strtok(NULL, "|");
-            total_commands++;
-        }
-
-        for (int i = 0; i < total_commands; i++) {
-            // Repeat singular command logic
-        }
-
-        
-        return 0;
     }
 
-    printf("No valid commands entered");
+    return buffer;
+}
+
+int main()
+{
+    while (true)
+    {
+        bool is_background = false;
+        int command_count = 0;
+        int input_count = 0;
+        int input_file_count = 0;
+        int output_file_count = 0;
+        char user_input[MAX_OUTPUT];
+        char *split_user_input[MAX_INPUT];
+        char *commands[MAX_INPUT];
+        char *input_files[MAX_OUTPUT];
+        char *output_files[MAX_OUTPUT];
+
+        printf("Enter your commands: ");
+
+        if (fgets(user_input, sizeof user_input, stdin) != NULL)
+        {
+            // If we do not have a pipe in the input
+            if (strchr(user_input, '|') == NULL)
+            {
+                // Input could be tabbed or newlined if copy/pasted into shell
+                char *input_segment = strtok(user_input, " \t\n");
+
+                while (input_segment != NULL && input_count < MAX_OUTPUT)
+                {
+                    split_user_input[input_count] = input_segment;
+                    input_count++;
+
+                    input_segment = strtok(NULL, " \t\n");
+                }
+
+                // now loop and keep track of what is happening
+                for (int i = 0; i < input_count; i++)
+                {
+                    // 1st item is the command
+                    if (i == 0)
+                    {
+                        commands[command_count] = split_user_input[i];
+                        command_count++;
+                    }
+                    // Do we have file input
+                    if (strcmp(split_user_input[i], "<") == 0 && i + 1 < input_count)
+                    {
+                        input_files[input_file_count] = split_user_input[i + 1];
+                        input_file_count++;
+                    }
+                    // Do we have a file output
+                    else if ((strcmp(split_user_input[i], ">") == 0 || strcmp(split_user_input[i], ">>") == 0) && i + 1 < input_count)
+                    {
+                        output_files[output_file_count] = split_user_input[i + 1];
+                        output_file_count++;
+                    }
+                    // Is this a background task
+                    else if (strcmp(split_user_input[i], "&") == 0)
+                    {
+                        is_background = true;
+                    }
+                }
+
+                char pretty_commands[MAX_OUTPUT] = {0};
+                char pretty_input_files[MAX_OUTPUT] = {0};
+                char pretty_output_files[MAX_OUTPUT] = {0};
+
+                printf("Commands: %s \n", combine_items(commands, command_count, pretty_commands));
+                if (input_file_count > 0)
+                {
+                    printf("Input file(s): %s \n", combine_items(input_files, input_file_count, pretty_input_files));
+                }
+                if (output_file_count > 0)
+                {
+                    printf("Output file(s): %s \n", combine_items(output_files, output_file_count, pretty_output_files));
+                }
+                printf("Background or Not: %s\n\n", is_background ? "Yes" : "No");
+            }
+            else
+            {
+                // we have multiple commands!
+            }
+        }
+        else
+        {
+            printf("\nBye bye!\n");
+        }
+    }
 
     return 0;
 }
