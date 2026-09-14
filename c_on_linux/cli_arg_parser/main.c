@@ -15,16 +15,129 @@ typedef struct
     char *commands[MAX_OUTPUT];
     char *input_files[MAX_OUTPUT];
     char *output_files[MAX_OUTPUT];
+    char command_buffer[MAX_OUTPUT];
     int input_file_count;
     int output_file_count;
     int command_count;
     bool is_background;
 } ParsedCommand;
 
+bool is_operator_symbol(char *user_input_part)
+{
+    bool is_file_input = strcmp(user_input_part, "<") == 0;
+    bool is_file_output = strcmp(user_input_part, ">") == 0 || strcmp(user_input_part, ">>") == 0;
+    bool is_background_task = strcmp(user_input_part, "&") == 0;
+    bool is_pipe = strcmp(user_input_part, "|") == 0;
+
+    return is_file_input || is_file_output || is_background_task || is_pipe;
+}
+
+bool is_invalid_grammar(char **user_input_parts, int input_count)
+{
+    // if nothing, it's invalid right away
+    if (input_count == 0)
+    {
+        printf("Please enter valid input! \n");
+        return true;
+    }
+
+    // first item needs to be a command
+    if (is_operator_symbol(user_input_parts[0]))
+    {
+        printf("Please enter a valid command! \n");
+        return true;
+    }
+
+    bool has_file_input_operand = false;
+    bool has_file_after_input_operand = false;
+    bool has_extra_file_input_operand = false;
+    bool has_file_output_operand = false;
+    bool has_file_after_output_operand = false;
+    bool has_extra_file_output_operand = false;
+    bool has_operands_in_right_order = false;
+    bool has_background_task_operand = false;
+    int file_input_idx = 0;
+    int file_output_idx = 0;
+    int background_task_idx = 0;
+
+    for (int i = 0; i < input_count; i++)
+    {
+        if (has_file_input_operand && strcmp(user_input_parts[i], "<") == 0 && file_input_idx)
+        {
+            has_extra_file_input_operand = true;
+        }
+        if (has_file_output_operand && (strcmp(user_input_parts[i], ">") == 0 || strcmp(user_input_parts[i], ">>") == 0) && file_output_idx)
+        {
+            has_extra_file_output_operand = true;
+        }
+        if (strcmp(user_input_parts[i], "<") == 0 && file_input_idx == 0)
+        {
+            has_file_input_operand = true;
+            file_input_idx = i;
+
+            if (i + 1 < input_count && !is_operator_symbol(user_input_parts[i + 1]))
+            {
+                has_file_after_input_operand = true;
+            }
+        }
+        if ((strcmp(user_input_parts[i], ">") == 0 || strcmp(user_input_parts[i], ">>") == 0) && file_output_idx == 0)
+        {
+            has_file_output_operand = true;
+            file_output_idx = i;
+
+            if (i + 1 < input_count && !is_operator_symbol(user_input_parts[i + 1]))
+            {
+                has_file_after_output_operand = true;
+            }
+        }
+        if (has_file_input_operand && has_file_output_operand)
+        {
+            has_operands_in_right_order = file_input_idx < file_output_idx;
+        }
+        if (strcmp(user_input_parts[i], "&") == 0 && background_task_idx == 0)
+        {
+            has_background_task_operand = true;
+            background_task_idx = i;
+        }
+    }
+
+    // If < && >/>>, are they in the right order?
+    if (!has_operands_in_right_order && has_file_input_operand && has_file_output_operand)
+    {
+        printf("Please enter file operands in correct order!\n");
+        return true;
+    }
+    // If <, does it only appear once? & does it have a filename afterwards?
+    if (has_file_input_operand && (has_extra_file_input_operand || !has_file_after_input_operand))
+    {
+        printf("Please enter a valid file input command!\n");
+        return true;
+    }
+    // if >/>>, does it only appear once? & does it have a filename afterwards
+    if (has_file_output_operand && (has_extra_file_output_operand || !has_file_after_output_operand))
+    {
+        printf("Please enter a valid file output command!\n");
+        return true;
+    }
+    // if &, is it in the right spot at the end?
+    if (has_background_task_operand && background_task_idx != input_count - 1)
+    {
+        printf("Pleas enter a valid background task command!\n");
+        return true;
+    }
+
+    return false;
+}
+
+bool is_piped_input_invalid(char **pipeline, int pipeline_count)
+{
+    // this one is similar, but shorter, as we just care about singular occurrences and spot checks
+}
+
 // parse a command input segment to check for file operands, commands, etc
 void parse_command_segment(char *segment, ParsedCommand *output)
 {
-    char *split_user_input[MAX_INPUT];
+    char *user_input_parts[MAX_INPUT];
     // Prevents losing where we are splitting strings!
     char *segment_saved_strtok_ptr;
     // Input could be tabbed or newlined if copy/pasted into shell
@@ -33,35 +146,36 @@ void parse_command_segment(char *segment, ParsedCommand *output)
 
     while (input_segment != NULL && input_count < MAX_INPUT)
     {
-        split_user_input[input_count] = input_segment;
+        user_input_parts[input_count] = input_segment;
         input_count++;
 
         input_segment = strtok_r(NULL, " \t\n", &segment_saved_strtok_ptr);
     }
 
+    // Check if this is a valid command based on the assignment grammar!
+    if (is_invalid_grammar(user_input_parts, input_count))
+    {
+        printf("Please enter a valid command structure!\n");
+        return;
+    }
+
     // now loop and keep track of what is happening
     for (int i = 0; i < input_count; i++)
     {
-        // 1st item is the command
-        if (i == 0)
-        {
-            output->commands[output->command_count] = split_user_input[i];
-            output->command_count++;
-        }
         // Do we have file input
-        if (strcmp(split_user_input[i], "<") == 0 && i + 1 < input_count)
+        if (strcmp(user_input_parts[i], "<") == 0 && i + 1 < input_count)
         {
-            output->input_files[output->input_file_count] = split_user_input[i + 1];
+            output->input_files[output->input_file_count] = user_input_parts[i + 1];
             output->input_file_count++;
         }
         // Do we have a file output
-        else if ((strcmp(split_user_input[i], ">") == 0 || strcmp(split_user_input[i], ">>") == 0) && i + 1 < input_count)
+        else if ((strcmp(user_input_parts[i], ">") == 0 || strcmp(user_input_parts[i], ">>") == 0) && i + 1 < input_count)
         {
-            output->output_files[output->output_file_count] = split_user_input[i + 1];
+            output->output_files[output->output_file_count] = user_input_parts[i + 1];
             output->output_file_count++;
         }
-        // Is this a background task
-        else if (strcmp(split_user_input[i], "&") == 0)
+        // Is this a background task? Must be at the end of the segment
+        else if (strcmp(user_input_parts[i], "&") == 0 && i == input_count - 1)
         {
             output->is_background = true;
         }
