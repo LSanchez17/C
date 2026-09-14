@@ -196,18 +196,37 @@ void parse_command_segment(char *segment, ParsedCommand *output)
         {
             output->input_files[output->input_file_count] = user_input_parts[i + 1];
             output->input_file_count++;
+            // valid grammar so skip over the next item to properly capture command args
+            i++;
         }
         // Do we have a file output
         else if ((strcmp(user_input_parts[i], ">") == 0 || strcmp(user_input_parts[i], ">>") == 0) && i + 1 < input_count)
         {
             output->output_files[output->output_file_count] = user_input_parts[i + 1];
             output->output_file_count++;
+            // valid grammar so skip over the next item to properly capture command args
+            i++;
         }
         // Is this a background task? Must be at the end of the segment
         else if (strcmp(user_input_parts[i], "&") == 0 && i == input_count - 1)
         {
             output->is_background = true;
         }
+        // no special characters, so ensure we are building the arguments for the command
+        else
+        {
+            if (output->command_buffer[0] != '\0')
+            {
+                strcat(output->command_buffer, " ");
+            }
+            strcat(output->command_buffer, user_input_parts[i]);
+        }
+    }
+    // append to the command with args
+    if (output->command_buffer[0] != '\0')
+    {
+        output->commands[output->command_count] = output->command_buffer;
+        output->command_count++;
     }
 }
 
