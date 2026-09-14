@@ -1,7 +1,10 @@
-// TODO:
-//             &  <-- invalid
-//             < input.txt <-- invalid invalid
-//             sleep 5 & echo "still going" <-- valid 2 commands
+// Luis Sanchez, 2026. Built on the assumption of the following assignment Grammar:
+// In the grammar below, [sth] denotes sth inside [ ] is optional; “|” denotes Unix pipe;
+// “*” denotes 0 or >=1 occurrences. The symbol “>” could be “>>” too.
+// command line → cmd [< fn] [| cmd]* [> fn] [&] EOL
+// cn -> string // command name
+// fn -> string // file name
+// ar -> string //argument
 
 #include <stdio.h>
 #include <string.h>
@@ -22,6 +25,7 @@ typedef struct
     bool is_background;
 } ParsedCommand;
 
+// is the input a special character
 bool is_operator_symbol(char *user_input_part)
 {
     bool is_file_input = strcmp(user_input_part, "<") == 0;
@@ -32,6 +36,7 @@ bool is_operator_symbol(char *user_input_part)
     return is_file_input || is_file_output || is_background_task || is_pipe;
 }
 
+// is the string segment valid by the grammar, singular input
 bool is_invalid_grammar(char **user_input_parts, int input_count)
 {
     // if nothing, it's invalid right away
@@ -129,9 +134,34 @@ bool is_invalid_grammar(char **user_input_parts, int input_count)
     return false;
 }
 
-bool is_piped_input_invalid(char **pipeline, int pipeline_count)
+// is the pipeline set up right according to the grammar (since each segment is checked itself for validity, this is easier to parse)
+bool is_pipeline_grammar_invalid(ParsedCommand *pipeline, int pipeline_count)
 {
-    // this one is similar, but shorter, as we just care about singular occurrences and spot checks
+    int last_idx = pipeline_count - 1;
+
+    for (int i = 0; i < pipeline_count; i++)
+    {
+        // ensure we only have one entry (the 1st) as a file input
+        if (i != 0 && pipeline[i].input_file_count > 0)
+        {
+            printf("Please enter a valid file input command!\n");
+            return true;
+        }
+        // ensure we only have the file output in the right pipeline slot
+        if (i != last_idx && pipeline[i].output_file_count > 0)
+        {
+            printf("Please enter a valid file output command!\n");
+            return true;
+        }
+        // ensure we only have the background at the last pipeline slot
+        if (i != last_idx && pipeline[i].is_background)
+        {
+            printf("Pleas enter a valid background task command!\n");
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // parse a command input segment to check for file operands, commands, etc
@@ -159,7 +189,6 @@ void parse_command_segment(char *segment, ParsedCommand *output)
         return;
     }
 
-    // now loop and keep track of what is happening
     for (int i = 0; i < input_count; i++)
     {
         // Do we have file input
@@ -255,7 +284,7 @@ int main()
 
                 if (parsed_command.command_count == 0)
                 {
-                    printf("Please enter a valid command\n");
+                    printf("Please enter a valid command!\n");
                 }
                 else
                 {
@@ -277,11 +306,17 @@ int main()
 
                     segment = strtok_r(NULL, "|", &saved_strtok_ptr);
                 }
+                if (is_pipeline_grammar_invalid(pipeline, pipeline_count))
+                {
+                    printf("Please enter a valid command!\n");
+                }
+                else
+                {
+                    ParsedCommand combined_commands = {0};
 
-                ParsedCommand combined_commands = {0};
-
-                aggregate_pipeline(pipeline, pipeline_count, &combined_commands);
-                print_parsed_command(&combined_commands);
+                    aggregate_pipeline(pipeline, pipeline_count, &combined_commands);
+                    print_parsed_command(&combined_commands);
+                }
             }
         }
         else
