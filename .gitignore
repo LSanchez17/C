@@ -1,4 +1,5 @@
 // No executables allowed
 */*.exe
+*/*/*.exe
 
 textbook/
