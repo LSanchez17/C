@@ -1,4 +1,5 @@
-// Luis Sanchez, 2026. Built on the assumption of the following assignment Grammar:
+// Luis Sanchez, 2026. 
+// /Built on the assumption of the following assignment Grammar:
 // In the grammar below, [sth] denotes sth inside [ ] is optional; “|” denotes Unix pipe;
 // “*” denotes 0 or >=1 occurrences. The symbol “>” could be “>>” too.
 // command line → cmd [< fn] [| cmd]* [> fn] [&] EOL
@@ -25,21 +26,21 @@ typedef struct
     bool is_background;
 } ParsedCommand;
 
-// is the input a special character
 bool is_operator_symbol(char *user_input_part)
 {
     bool is_file_input = strcmp(user_input_part, "<") == 0;
     bool is_file_output = strcmp(user_input_part, ">") == 0 || strcmp(user_input_part, ">>") == 0;
     bool is_background_task = strcmp(user_input_part, "&") == 0;
     bool is_pipe = strcmp(user_input_part, "|") == 0;
+    bool is_forward_slash = strcmp(user_input_part, "/") == 0;
+    bool is_at_symbol = strcmp(user_input_part, "@") == 0;
+    bool is_hashtag = strcmp(user_input_part, "#") == 0;
 
-    return is_file_input || is_file_output || is_background_task || is_pipe;
+    return is_file_input || is_file_output || is_background_task || is_pipe || is_forward_slash | is_at_symbol | is_hashtag;
 }
 
-// is the string segment valid by the grammar, singular input
 bool is_invalid_grammar(char **user_input_parts, int input_count)
 {
-    // if nothing, it's invalid right away
     if (input_count == 0)
     {
         printf("Please enter valid input! \n");
@@ -134,14 +135,12 @@ bool is_invalid_grammar(char **user_input_parts, int input_count)
     return false;
 }
 
-// is the pipeline set up right according to the grammar (since each segment is checked itself for validity, this is easier to parse)
 bool is_pipeline_grammar_invalid(ParsedCommand *pipeline, int pipeline_count)
 {
     int last_idx = pipeline_count - 1;
 
     for (int i = 0; i < pipeline_count; i++)
     {
-        // an empty or otherwise rejected segment (e.g. from "||", a leading/trailing "|") has no command
         if (pipeline[i].command_count == 0)
         {
             printf("Please enter a command between every pipe!\n");
@@ -170,7 +169,6 @@ bool is_pipeline_grammar_invalid(ParsedCommand *pipeline, int pipeline_count)
     return false;
 }
 
-// parse a command input segment to check for file operands, commands, etc
 void parse_command_segment(char *segment, ParsedCommand *output)
 {
     char *user_input_parts[MAX_INPUT];
@@ -188,37 +186,31 @@ void parse_command_segment(char *segment, ParsedCommand *output)
         input_segment = strtok_r(NULL, " \t\n", &segment_saved_strtok_ptr);
     }
 
-    // Check if this is a valid command based on the assignment grammar!
     if (is_invalid_grammar(user_input_parts, input_count))
     {
-        printf("Please enter a valid command structure!\n");
         return;
     }
 
     for (int i = 0; i < input_count; i++)
     {
-        // Do we have file input
         if (strcmp(user_input_parts[i], "<") == 0 && i + 1 < input_count)
         {
             output->input_files[output->input_file_count] = user_input_parts[i + 1];
             output->input_file_count++;
-            // valid grammar so skip over the next item to properly capture command args
+            // At this point, we have a valid grammar so skip over the next item to properly capture command args
             i++;
         }
-        // Do we have a file output
         else if ((strcmp(user_input_parts[i], ">") == 0 || strcmp(user_input_parts[i], ">>") == 0) && i + 1 < input_count)
         {
             output->output_files[output->output_file_count] = user_input_parts[i + 1];
             output->output_file_count++;
-            // valid grammar so skip over the next item to properly capture command args
+            // At this point, we have a valid grammar so skip over the next item to properly capture command args
             i++;
         }
-        // Is this a background task? Must be at the end of the segment
         else if (strcmp(user_input_parts[i], "&") == 0 && i == input_count - 1)
         {
             output->is_background = true;
         }
-        // no special characters, so ensure we are building the arguments for the command
         else
         {
             if (output->command_buffer[0] != '\0')
@@ -228,7 +220,6 @@ void parse_command_segment(char *segment, ParsedCommand *output)
             strcat(output->command_buffer, user_input_parts[i]);
         }
     }
-    // append to the command with args
     if (output->command_buffer[0] != '\0')
     {
         output->commands[output->command_count] = output->command_buffer;
@@ -236,7 +227,6 @@ void parse_command_segment(char *segment, ParsedCommand *output)
     }
 }
 
-// output the array as one string using a buffer technique
 char *combine_items(char **items, int total_items, char *buffer)
 {
     for (int i = 0; i < total_items; i++)
@@ -252,7 +242,6 @@ char *combine_items(char **items, int total_items, char *buffer)
     return buffer;
 }
 
-// Cleanly print the result of parsing input
 void print_parsed_command(ParsedCommand *parsed_command)
 {
     char pretty_input_files[MAX_OUTPUT] = {0};
@@ -260,12 +249,11 @@ void print_parsed_command(ParsedCommand *parsed_command)
     char pretty_command_count[MAX_OUTPUT] = {0};
 
     printf("Commands: %s \n", combine_items(parsed_command->commands, parsed_command->command_count, pretty_command_count));
-    printf("Input file(s): %s \n", parsed_command->input_file_count > 0 ? combine_items(parsed_command->input_files, parsed_command->input_file_count, pretty_input_files) : "None");
-    printf("Output file(s): %s \n", parsed_command->output_file_count > 0 ? combine_items(parsed_command->output_files, parsed_command->output_file_count, pretty_output_files) : "None");
+    printf("Input file: %s \n", parsed_command->input_file_count > 0 ? combine_items(parsed_command->input_files, parsed_command->input_file_count, pretty_input_files) : "None");
+    printf("Output file: %s \n", parsed_command->output_file_count > 0 ? combine_items(parsed_command->output_files, parsed_command->output_file_count, pretty_output_files) : "None");
     printf("Background or Not: %s\n\n", parsed_command->is_background ? "Yes" : "No");
 }
 
-// Build a clean struct of all piped command structs
 void aggregate_pipeline(ParsedCommand *pipeline, int pipeline_count, ParsedCommand *output)
 {
     for (int i = 0; i < pipeline_count; i++)
@@ -302,6 +290,13 @@ int main()
 
         if (fgets(user_input, sizeof user_input, stdin) != NULL)
         {
+            user_input[strcspn(user_input, "\r\n")] = '\0';
+            if (strcmp(user_input, "exit") == 0)
+            {
+                printf("Bye bye!\n");
+                return 0;
+            }
+
             if (strchr(user_input, '|') == NULL)
             {
                 ParsedCommand parsed_command = {0};
@@ -309,7 +304,7 @@ int main()
 
                 if (parsed_command.command_count == 0)
                 {
-                    printf("Please enter a valid command!\n");
+                    continue;
                 }
                 else
                 {
@@ -344,7 +339,7 @@ int main()
 
                 if (is_pipeline_grammar_invalid(pipeline, pipeline_count))
                 {
-                    printf("Please enter a valid command!\n");
+                    continue;
                 }
                 else
                 {
