@@ -141,6 +141,12 @@ bool is_pipeline_grammar_invalid(ParsedCommand *pipeline, int pipeline_count)
 
     for (int i = 0; i < pipeline_count; i++)
     {
+        // an empty or otherwise rejected segment (e.g. from "||", a leading/trailing "|") has no command
+        if (pipeline[i].command_count == 0)
+        {
+            printf("Please enter a command between every pipe!\n");
+            return true;
+        }
         // ensure we only have one entry (the 1st) as a file input
         if (i != 0 && pipeline[i].input_file_count > 0)
         {
@@ -312,19 +318,30 @@ int main()
             }
             else
             {
-                // Prevents losing where we are splitting strings!
-                char *saved_strtok_ptr;
-                char *segment = strtok_r(user_input, "|", &saved_strtok_ptr);
+                char *cursor = user_input;
                 int pipeline_count = 0;
                 ParsedCommand pipeline[MAX_INPUT] = {0};
 
-                while (segment != NULL)
+                while (pipeline_count < MAX_INPUT)
                 {
-                    parse_command_segment(segment, &pipeline[pipeline_count]);
+                    char *pipeline_location = strchr(cursor, '|');
+
+                    if (pipeline_location != NULL)
+                    {
+                        *pipeline_location = '\0';
+                    }
+
+                    parse_command_segment(cursor, &pipeline[pipeline_count]);
                     pipeline_count++;
 
-                    segment = strtok_r(NULL, "|", &saved_strtok_ptr);
+                    if (pipeline_location == NULL)
+                    {
+                        break;
+                    }
+
+                    cursor = pipeline_location + 1;
                 }
+
                 if (is_pipeline_grammar_invalid(pipeline, pipeline_count))
                 {
                     printf("Please enter a valid command!\n");
